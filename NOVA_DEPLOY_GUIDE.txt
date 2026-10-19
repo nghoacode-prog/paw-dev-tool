@@ -1,0 +1,55 @@
+NOVA PAW — HƯỚNG DẪN DEPLOY RENDER (TỪNG FILE, KHÔNG ZIP)
+========================================================
+
+CÁC FILE CẦN ĐƯA VÀO THƯ MỤC GỐC CÙNG MỘT REPOSITORY
+1. NOVA_GATEWAY_SERVICE.py      Gateway Flask, API license/admin, cache dự đoán
+2. NOVA_PREDICTION_ENGINE.py    Engine hiện có; Gateway import đúng tên module mới
+3. NOVA_ADMIN_CONSOLE.html      Giao diện quản trị mới, được phục vụ ở /admin
+4. NOVA_ADMIN_BOT.py            Bot Telegram (tùy chọn; Gateway gọi nếu có TELEGRAM_BOT_TOKEN)
+5. NOVA_KEY_ACTIVATION.html     Trang kích hoạt, Gateway phục vụ tại /activate
+6. NOVA_DEPENDENCIES.txt        Danh sách Python package
+
+Render → Web Service → Settings → Build & Deploy:
+Build Command:
+  pip install -r NOVA_DEPENDENCIES.txt
+
+Start Command:
+  gunicorn NOVA_GATEWAY_SERVICE:app --workers 1 --threads 8 --timeout 120
+
+Runtime nên chọn Python 3.11 hoặc 3.12. Vì tên file requirements đã đổi để tránh đụng bản cũ,
+phải điền Build Command ở trên; đừng để Render tự đoán requirements.txt mặc định.
+
+ENVIRONMENT VARIABLES
+- PAWNOVA_ADMIN_PASSWORD = mật khẩu mạnh của trang /admin
+- PAWNOVA_SESSION_SECRET = chuỗi bí mật ngẫu nhiên dài tối thiểu 32 ký tự
+- PAWNOVA_DB_PATH = /var/data/pawnova.sqlite3  (chỉ đặt khi đã gắn Persistent Disk tại /var/data)
+- PAWNOVA_POLL_SECONDS = 5
+- PAWNOVA_ENABLE_POLLING = true
+- COOKIE_SECURE = true
+- TELEGRAM_BOT_TOKEN = token bot, nếu dùng bot hoặc gửi thông báo Telegram
+- TELEGRAM_OWNER_ID = Telegram ID chủ bot (nếu dùng bot)
+- TELEGRAM_ADMIN_IDS = danh sách ID admin phân cách dấu phẩy (nếu dùng bot)
+- PAWNOVA_PUBLIC_URL = URL HTTPS của Web Service, nếu dùng bot
+
+LƯU Ý DATABASE
+Render filesystem mặc định có thể mất dữ liệu sau redeploy. Nếu cần giữ key, đơn hàng và lịch sử,
+hãy tạo/gắn Persistent Disk vào /var/data rồi mới đặt PAWNOVA_DB_PATH=/var/data/pawnova.sqlite3.
+Không đổi path database giữa các lần deploy nếu chưa sao lưu/chuyển database.
+
+SAU KHI DEPLOY — KIỂM TRA THEO THỨ TỰ
+1. Mở https://TEN-SERVICE.onrender.com/health
+   - status online và database ok mới chỉ xác nhận Gateway/DB cơ bản.
+   - predictions.hu.ready và predictions.md5.ready cần true mới có snapshot cho cả hai bàn.
+   - nếu ready false, đọc last_error; API dự đoán có thể trả HTTP 503 cho đến khi nguồn/engine hoạt động.
+2. Mở https://TEN-SERVICE.onrender.com/admin, đăng nhập bằng PAWNOVA_ADMIN_PASSWORD.
+3. Trang kích hoạt: https://TEN-SERVICE.onrender.com/activate.
+4. Vào Dự đoán trực tiếp kiểm tra riêng HU và MD5.
+5. API công khai: GET /api/predict?game=hu hoặc /api/predict?game=md5, cần gửi X-API-Key
+   và X-Device-ID hợp lệ. Không thể xác nhận endpoint dự đoán bằng /health đơn lẻ.
+6. Giao diện lịch sử quản trị chỉ hiện những lượt dự đoán đã được ghi vào prediction_logs khi khách
+   gọi API dự đoán bằng key hợp lệ. Dữ liệu thực tế sẽ trống cho đến khi nguồn trả kết quả phiên.
+
+AN TOÀN
+- Không đưa PAWNOVA_ADMIN_PASSWORD, SESSION_SECRET hoặc TELEGRAM_BOT_TOKEN vào code/repository.
+- Không duyệt đơn nếu chưa xác minh thanh toán thực tế.
+- Dự đoán Tài/Xỉu không được bảo đảm chính xác; READY chỉ nói về trạng thái kỹ thuật của nguồn/cache.
