@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: paw-dev-private-api78
+    runtime: python
+    buildCommand: pip install -r PAWNOVA_REQUIREMENTS.txt
+    startCommand: gunicorn PAWNOVA_GATEWAY:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: PAWNOVA_ADMIN_PASSWORD
+        sync: false
+      - key: PAWNOVA_SESSION_SECRET
+        generateValue: true
+      - key: PAWNOVA_DB_PATH
+        value: /var/data/pawnova.sqlite3
+      - key: PAWNOVA_DB_BACKUP
+        value: "true"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_OWNER_ID
+        value: "8217369095"
+      - key: PAWNOVA_ENABLE_POLLING
+        value: "true"
+      - key: PAWNOVA_ENABLE_BOT
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+    disk:
+      name: pawnova-data
+      mountPath: /var/data
+      sizeGB: 1
